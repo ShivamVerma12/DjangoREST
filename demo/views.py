@@ -1,5 +1,6 @@
-from django.http import Http404
+from django.http import Http404, HttpResponseBadRequest, JsonResponse
 from django.shortcuts import render
+from rest_framework.exceptions import NotFound
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
@@ -9,33 +10,58 @@ from django.shortcuts import get_object_or_404
 
 
 # Create your views here.
+def validate(data):
+    if data.get('first_name'):
+        first = data.get('first_name')
+        if not isinstance(first, str):
+            return False, "First name should be String"
+
+    if data.get('last_name'):
+        last = data.get('last_name')
+        if not isinstance(last, str) :
+            return False, "Last name should be String"
+
+    if data.get('class_name'):
+        clss = data.get('class_name')
+        if not isinstance(clss, str):
+            return False, "Class name should be String"
+
+    if data.get('age'):
+        age = data.get('age')
+        if not isinstance(age, int):
+            return False, "Age should be int"
+
+    return True, "Success"
+
 
 class StudentView(APIView):
 
-    # GET ALL
-    def get(self, request, pk=None):
+    def get(self, request, id=None):
 
-        if pk:
-            result = Students.objects.filter(pk=pk)
+        if id:
+
+            result = Students.objects.filter(id=id)
 
         else:
             result = Students.objects.all()
 
         serializers = StudentSerializer(result, many=True)
-        return Response({"students": serializers.data}, status=200)
+        return Response({"students": serializers.data})
 
     # CREATE
     def post(self, request):
+
         data = request.data
+        flag, msg = validate(data)
+        if not flag:
+            return Response({'Message': msg}, status=400)
+
+        # validate(data)
         serializer = StudentSerializer(data=data)
 
-        # Check if the data passed is valid
         serializer.is_valid(raise_exception=True)
 
-        # Create Student in the DB
         serializer.save()
-
-        # Return Response to User
 
         response = Response()
 
@@ -47,14 +73,24 @@ class StudentView(APIView):
         return response
 
     # UPDATE
-    def put(self, request, pk):
-        # import pdb
-        # pdb.set_trace()
+    def patch(self, request, id):
+        # # import pdb
+        # # pdb.set_trace()
+        #
+        # # student_to_update = get_object_or_404(Students, id=id)
+        # student_update = Students.objects.filter(id=id)
+        #
+        # # student_to_update = Students.objects.get(pk=pk)
+        #
+        # # student_to_update:
+        update = Students.objects.get(id=id)
 
-        # student_to_update = Students.objects.get(pk=pk)
-        student_to_update = get_object_or_404(Students, pk=pk)
-        # student_to_update:
-        serializer = StudentSerializer(instance=student_to_update, data=request.data, partial=True)
+        data = request.data
+        flag, msg = validate(data)
+        if not flag:
+            return Response({'Message': msg}, status=400)
+
+        serializer = StudentSerializer(instance=update, data=request.data, partial=True)
 
         serializer.is_valid(raise_exception=True)
 
@@ -69,9 +105,26 @@ class StudentView(APIView):
 
         return response
 
-    # DELETE
-    def delete(self, request, pk):
-        result = get_object_or_404(Students, pk=pk)
+    def put(self, request, id):
+        data = request.data
+        print(data)
+        flag, msg = validate(data)
+        if not flag:
+            return Response({'Message': msg}, status=400)
+
+        update = Students.objects.get(id=id)
+        print(update)
+        serializer = StudentSerializer(instance=update, data=data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+
+        return Response({'Message': "Student updated Successfully", "data": serializer.data})
+
+        # DELETE
+
+    def delete(self, request, id):
+
+        result = get_object_or_404(Students, id=id)
 
         result.delete()
         return Response({"data": "Record Deleted"})
